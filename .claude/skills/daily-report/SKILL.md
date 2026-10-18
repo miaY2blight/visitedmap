@@ -8,7 +8,7 @@ allowed-tools: Write
 1. このセッション内の今日の会話を確認する。
 2. 作業内容を要約する。
 3. つまずいた点や気づいた点(備考)を要約する。
-4. `daily_report_YYYYMMDD.md`(今日の日付)という名前のMarkdownファイルをプロジェクトルートに作成する。全体の長さは日本語で200文字程度とし、以下の構成にする:
+4. `daily_report_YYYYMMDD.md`(今日の日付)という名前のMarkdownファイルを、プロジェクトルート直下の `daily_reports/` ディレクトリに作成する(Git管理対象外)。全体の長さは日本語で200文字程度とし、以下の構成にする:
 
 ```markdown
 # 日報 YYYY-MM-DD
