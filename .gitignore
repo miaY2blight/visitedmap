@@ -1,2 +1,6 @@
 # 日報は Git 管理しない
 daily_reports/
+
+# 設計ドキュメントと作業用ファイルは GitHub に置かない(ローカルのみ)
+docs/
+test.html

@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
+
+import 'geolocator_gateway.dart';
+import 'location_mover.dart';
+import 'message_presenter.dart';
 
 /// 現在地が取れない場合の初期表示位置(東京駅)
 const LatLng tokyoStation = LatLng(35.681236, 139.767125);
@@ -9,8 +14,10 @@ const String _styleUrl = 'https://tiles.openfreemap.org/styles/liberty';
 // 東京駅フォールバック時は広域、現在地へ移動する時は街区が見えるズーム
 const double _fallbackZoom = 11;
 const double _currentLocationZoom = 15;
-// 直近位置と新規測位がこの距離(m)以上ずれた時だけ再移動する
-const double _refineThresholdMeters = 50;
+// この時間内にスタイルが読み込めなければ通信エラーとして案内する
+const Duration _styleLoadTimeout = Duration(seconds: 15);
+const Duration _ownMoveGrace = Duration(milliseconds: 300);
+const String _mapLoadFailedMessage = '地図を読み込めません。通信環境を確認してください';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -22,70 +29,81 @@ class MapPage extends StatefulWidget {
 class _MapPageState extends State<MapPage> {
   MapLibreMapController? _controller;
   bool _locationEnabled = false;
+  late final MessagePresenter _messages = MessagePresenter(
+    () => mounted ? ScaffoldMessenger.of(context) : null,
+  );
+  // 地図の準備前に来た移動先。準備後に実行する(準備前に呼ばれても失われないように)
+  LatLng? _pendingTarget;
+  Timer? _styleLoadTimer;
+  // アプリ自身のカメラ移動中の件数(完了後も少し猶予を持たせて数える)。
+  // これが0の間に来たカメラ移動は、利用者が地図を動かしたものとみなす
+  int _ownMoves = 0;
+  bool _userMoved = false;
+  // 地図の初期化中に出るカメラ移動を、利用者の操作と誤認しないための目印
+  bool _styleLoaded = false;
+  late final LocationMover _mover;
 
   @override
   void initState() {
     super.initState();
-    _moveToCurrentLocation();
-  }
-
-  Future<bool> _ensureLocationPermission() async {
-    if (!await Geolocator.isLocationServiceEnabled()) return false;
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-    return permission == LocationPermission.whileInUse ||
-        permission == LocationPermission.always;
-  }
-
-  Future<void> _animateTo(Position position) async {
-    await _controller?.animateCamera(
-      CameraUpdate.newLatLngZoom(
-        LatLng(position.latitude, position.longitude),
-        _currentLocationZoom,
-      ),
+    _mover = LocationMover(
+      gateway: const GeolocatorGateway(),
+      showMessage: _messages.show,
+      enableLocation: _enableLocation,
+      moveCamera: _moveCamera,
+      onStart: () => _userMoved = false,
+      userMovedCamera: () => _userMoved,
     );
+    // 表示中の別メッセージに握りつぶされないよう、置き換えて出す
+    _styleLoadTimer = Timer(
+      _styleLoadTimeout,
+      () => _messages.show(_mapLoadFailedMessage, replaceCurrent: true),
+    );
+    _mover.moveToCurrentLocation();
   }
 
-  Future<void> _moveToCurrentLocation() async {
-    final granted = await _ensureLocationPermission();
+  @override
+  void dispose() {
+    _styleLoadTimer?.cancel();
+    super.dispose();
+  }
+
+  void _onMapCreated(MapLibreMapController controller) {
+    _controller = controller;
+    final pending = _pendingTarget;
+    if (pending != null) {
+      _pendingTarget = null;
+      _moveCamera(pending);
+    }
+  }
+
+  void _enableLocation() {
+    if (!mounted || _locationEnabled) return;
+    setState(() => _locationEnabled = true);
+  }
+
+  Future<void> _moveCamera(LatLng target) async {
     if (!mounted) return;
-    if (!granted) {
-      _showMessage('位置情報が利用できません。設定で権限と位置情報をオンにしてください');
+    final controller = _controller;
+    if (controller == null) {
+      _pendingTarget = target;
       return;
     }
-    setState(() => _locationEnabled = true);
-
-    // 新規測位は数秒かかるため、端末が保持する直近の位置へ先に移動して即応させる
-    final lastKnown = await Geolocator.getLastKnownPosition();
-    if (!mounted) return;
-    if (lastKnown != null) await _animateTo(lastKnown);
-
+    // アプリ自身の移動を基準に、その後の利用者の操作だけを数える
+    _userMoved = false;
+    _ownMoves++;
     try {
-      final current = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
-        ),
+      await controller.animateCamera(
+        CameraUpdate.newLatLngZoom(target, _currentLocationZoom),
       );
-      if (!mounted) return;
-      final moved = lastKnown == null ||
-          Geolocator.distanceBetween(
-                lastKnown.latitude,
-                lastKnown.longitude,
-                current.latitude,
-                current.longitude,
-              ) >
-              _refineThresholdMeters;
-      if (moved) await _animateTo(current);
-    } catch (_) {
-      if (mounted && lastKnown == null) _showMessage('現在地を取得できませんでした');
+    } finally {
+      // 完了通知の後に遅れて届くカメラ移動を、利用者の操作と誤認しないための猶予
+      Future<void>.delayed(_ownMoveGrace, () => _ownMoves--);
     }
   }
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  void _onCameraMove(CameraPosition _) {
+    if (_styleLoaded && _ownMoves == 0) _userMoved = true;
   }
 
   @override
@@ -98,10 +116,17 @@ class _MapPageState extends State<MapPage> {
           zoom: _fallbackZoom,
         ),
         myLocationEnabled: _locationEnabled,
-        onMapCreated: (controller) => _controller = controller,
+        onMapCreated: _onMapCreated,
+        // onCameraMove を受け取るには、カメラ位置の追跡を有効にする必要がある
+        trackCameraPosition: true,
+        onCameraMove: _onCameraMove,
+        onStyleLoadedCallback: () {
+          _styleLoadTimer?.cancel();
+          _styleLoaded = true;
+        },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _moveToCurrentLocation,
+        onPressed: _mover.moveToCurrentLocation,
         child: const Icon(Icons.my_location),
       ),
     );
