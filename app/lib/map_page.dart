@@ -29,6 +29,9 @@ class MapPage extends StatefulWidget {
 class _MapPageState extends State<MapPage> {
   MapLibreMapController? _controller;
   bool _locationEnabled = false;
+  // 位置表示を有効にした時点の、許可されていた精度
+  LocationPrecision? _displayPrecision;
+  bool _restartingDisplay = false;
   late final MessagePresenter _messages = MessagePresenter(
     () => mounted ? ScaffoldMessenger.of(context) : null,
   );
@@ -77,9 +80,31 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
-  void _enableLocation() {
-    if (!mounted || _locationEnabled) return;
-    setState(() => _locationEnabled = true);
+  void _enableLocation(LocationPrecision precision) {
+    if (!mounted) return;
+    final previous = _displayPrecision;
+    _displayPrecision = precision;
+    if (!_locationEnabled) {
+      setState(() => _locationEnabled = true);
+    } else if (previous == LocationPrecision.approximate &&
+        precision == LocationPrecision.precise) {
+      _restartLocationDisplay();
+    }
+  }
+
+  // 位置表示は一度有効にすると、権限が「おおよそ」から「正確」に変わっても作り直されず、
+  // 点が出ないままになる。いったん無効にしてから有効に戻して作り直す
+  Future<void> _restartLocationDisplay() async {
+    if (_restartingDisplay) return;
+    _restartingDisplay = true;
+    try {
+      setState(() => _locationEnabled = false);
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      setState(() => _locationEnabled = true);
+    } finally {
+      _restartingDisplay = false;
+    }
   }
 
   Future<void> _moveCamera(LatLng target) async {
@@ -126,7 +151,8 @@ class _MapPageState extends State<MapPage> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _mover.moveToCurrentLocation,
+        tooltip: '現在地へ移動',
+        onPressed: () => _mover.moveToCurrentLocation(userInitiated: true),
         child: const Icon(Icons.my_location),
       ),
     );

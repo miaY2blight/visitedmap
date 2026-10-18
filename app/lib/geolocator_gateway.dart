@@ -1,6 +1,7 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
+import 'dismiss_fallback.dart';
 import 'location_mover.dart';
 
 class GeolocatorGateway implements LocationGateway {
@@ -13,9 +14,22 @@ class GeolocatorGateway implements LocationGateway {
   Future<LocationAccess> checkAccess() async =>
       _toAccess(await Geolocator.checkPermission());
 
+  // ダイアログを「戻る」で閉じても Future が完了しないため、戻った後は現在の権限状態で代替する
   @override
-  Future<LocationAccess> requestAccess() async =>
-      _toAccess(await Geolocator.requestPermission());
+  Future<LocationAccess> requestAccess() => withDismissFallback(
+        Geolocator.requestPermission().then(_toAccess),
+        checkAccess,
+      );
+
+  // Android では、FINE が許可済みなら precise、COARSE のみなら reduced を返す。
+  // 判別できない(unknown)場合は、不必要に案内しないよう precise として扱う
+  @override
+  Future<LocationPrecision> checkPrecision() async {
+    final status = await Geolocator.getLocationAccuracy();
+    return status == LocationAccuracyStatus.reduced
+        ? LocationPrecision.approximate
+        : LocationPrecision.precise;
+  }
 
   @override
   Future<LatLng?> lastKnown() async {
