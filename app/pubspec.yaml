@@ -59,6 +59,10 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # 同梱データ(世界の国の簡略境界、海の一覧)。tools/data が作る。国ごとのデータパックは同梱せず、ダウンロードする
+  assets:
+    - assets/data/
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

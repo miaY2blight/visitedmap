@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'map_page.dart';
+import 'package:fogworld/features/map/map_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -11,9 +11,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      title: 'FogWorld',
-      home: MapPage(),
-    );
+    return const MaterialApp(title: '地識録', home: MapPage());
   }
 }

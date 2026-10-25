@@ -1,8 +1,8 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
-import 'dismiss_fallback.dart';
-import 'location_mover.dart';
+import 'package:fogworld/app/dismiss_fallback.dart';
+import 'package:fogworld/core/data/location/location_gateway.dart';
 
 class GeolocatorGateway implements LocationGateway {
   const GeolocatorGateway();
