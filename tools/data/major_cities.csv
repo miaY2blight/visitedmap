@@ -1,0 +1,6 @@
+city_id,name_local,name_ja,iso3,center_lat,center_lon,boundary
+paris,Paris,パリ,FRA,48.8566,2.3522,radius_km:20
+sydney,Sydney,シドニー,AUS,-33.8688,151.2093,radius_km:20
+los_angeles,Los Angeles,ロサンゼルス,USA,34.0522,-118.2437,radius_km:20
+seoul,서울,ソウル,KOR,37.5300,127.0200,radius_km:20
+new_york_manhattan,Manhattan,ニューヨーク(マンハッタン),USA,40.7580,-73.9855,radius_km:20

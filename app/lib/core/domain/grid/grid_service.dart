@@ -21,15 +21,16 @@ class GridService {
   /// 周長がとても長い形(細い櫛形など)が、長時間止まらないようにする
   static const int maxVisitedCells = 2000000;
 
-  /// 円の半径の上限(m)
-  static const double maxRadiusMeters = 50000;
+  /// 円の半径の上限(m)。点+半径の全体の上限(`GameConfig.radiusMaxMeters`)以上にする。
+  /// 半径 100km の円は、開始階層 z10 で約 7×7 セル・被覆 約 1.8 万セル(上限の内側)
+  static const double maxRadiusMeters = 100000;
 
   static const int _circleVertices = 64;
 
   /// 点を含む z19 のセル1つ
   List<CellKey> coverPoint(GeoPoint p) => [CellKey.fromPoint(p, storageZoom)];
 
-  /// 中心と半径(0 < r <= 50000)の円。結果に中心の z19 セルを必ず含める。範囲外は [ArgumentError]
+  /// 中心と半径(0 < r <= [maxRadiusMeters])の円。結果に中心の z19 セルを必ず含める。範囲外は [ArgumentError]
   List<CellKey> coverCircle(GeoPoint center, double radiusMeters) {
     if (!radiusMeters.isFinite || radiusMeters <= 0 || radiusMeters > maxRadiusMeters) {
       throw ArgumentError.value(radiusMeters, 'radiusMeters', '0 より大きく $maxRadiusMeters 以下');

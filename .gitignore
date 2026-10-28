@@ -7,3 +7,6 @@ test.html
 
 # 単体テストは GitHub に置かない(ローカルのみ)
 app/test/
+
+# ビルド時に渡す API キー(Geoapify)。リポジトリに入れない
+app/dart_defines.local.json

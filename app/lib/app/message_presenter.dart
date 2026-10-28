@@ -18,12 +18,16 @@ class MessagePresenter {
   ///
   /// [actionLabel] と [onAction] で通知にボタンを付ける(押すと通知は閉じる)。
   /// [persistent] が true なら、利用者がボタンで閉じるまで消えない(読み逃すと回復手段を失う失敗の通知用)
+  ///
+  /// [bottomMargin] を渡すと、画面の下からその高さだけ離して浮かせて出す
+  /// (下に固定のパネルがあるとき、パネルの「記録する」を通知が覆わないように)
   void show(
     String message, {
     bool replaceCurrent = false,
     String? actionLabel,
     VoidCallback? onAction,
     bool persistent = false,
+    double? bottomMargin,
   }) {
     final messenger = _messenger();
     if (messenger == null) return;
@@ -33,6 +37,8 @@ class MessagePresenter {
     final controller = messenger.showSnackBar(
       SnackBar(
         content: Text(message),
+        behavior: bottomMargin == null ? null : SnackBarBehavior.floating,
+        margin: bottomMargin == null ? null : EdgeInsets.fromLTRB(12, 0, 12, bottomMargin),
         // アクション付きは既定で消えなくなるため、persistent のときだけ消えない形にそろえる
         persist: persistent,
         // 消えない通知は、スワイプで消せると回復の手段(ボタン)を失う。閉じるボタンだけで閉じられるようにする
